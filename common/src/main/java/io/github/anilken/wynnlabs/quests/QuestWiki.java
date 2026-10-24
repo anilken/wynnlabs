@@ -58,6 +58,8 @@ public final class QuestWiki {
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private static final Pattern COORDS = Pattern.compile("\\[\\s*(-?\\d+)\\s*,\\s*(-?\\d+)\\s*,\\s*(-?\\d+)\\s*]");
     private static final Pattern RENDER = Pattern.compile("\\|\\s*x\\s*=\\s*(-?\\d+)\\s*\\|\\s*y\\s*=\\s*(-?\\d+)\\s*\\|\\s*z\\s*=\\s*(-?\\d+)");
+    /** A RenderLocation with x and z only (the Silent Expanse's pages): the height is guessed. */
+    private static final Pattern RENDER_XZ = Pattern.compile("\\|\\s*x\\s*=\\s*(-?\\d+)\\s*\\|\\s*z\\s*=\\s*(-?\\d+)");
 
     private static final Pattern RENDER_NAME = Pattern.compile("location\\s*=\\s*([^|}]+)");
 
@@ -389,8 +391,13 @@ public final class QuestWiki {
                     continue;
                 }
                 Matcher r = RENDER.matcher(l);
-                if (r.find()) {
-                    int[] pt = {Integer.parseInt(r.group(1)), Integer.parseInt(r.group(2)), Integer.parseInt(r.group(3))};
+                Matcher rxz = RENDER_XZ.matcher(l);
+                boolean full = r.find();
+                if (full || l.contains("{{RenderLocation") && rxz.find()) {
+                    // no height given: the last point's, else ground level
+                    int y = points.isEmpty() ? 64 : points.get(points.size() - 1)[1];
+                    int[] pt = full ? new int[] {Integer.parseInt(r.group(1)), Integer.parseInt(r.group(2)), Integer.parseInt(r.group(3))}
+                            : new int[] {Integer.parseInt(rxz.group(1)), y, Integer.parseInt(rxz.group(2))};
                     Matcher nm = RENDER_NAME.matcher(l);
                     points.add(pt);
                     names.add(nm.find() ? clean(nm.group(1)) : UNNAMED);
