@@ -14,7 +14,7 @@ import java.util.List;
 /**
  * The box window's listings of the chosen item: per listing its overall roll as a bar coloured
  * by the roll, the roll % of its key stats, rerolls, price and how long ago it was seen. High
- * rolls (rules boxHighRoll, 80 %) are lit; listings seen 3+ hours before the newest are faded and
+ * rolls (rules boxHighRoll, 80 %) are lit; listings seen 3+ days before the newest are faded and
  * marked "may be sold". Under the list, "x / total" and a "more" row while the market has more
  * pages; that row, or scrolling to the end, asks for the next page. No seller is ever shown.
  * Items without rolls (ingredients, materials) get a one-line table instead ({@link BoxPlainRows}).
