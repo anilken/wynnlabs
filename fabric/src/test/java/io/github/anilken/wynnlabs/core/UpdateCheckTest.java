@@ -44,7 +44,7 @@ class UpdateCheckTest {
         assertTrue(UpdateCheck.checkable("0.2.0"));
         assertTrue(UpdateCheck.checkable("v0.1.0"));
         assertFalse(UpdateCheck.checkable("0.2.0-dev"));
-        assertTrue(UpdateCheck.checkable("0.2.1+dev"));
+        assertFalse(UpdateCheck.checkable("0.2.1+dev"), "a local build never updates itself");
         assertFalse(UpdateCheck.newer("v0.2.1", "0.2.1+dev"));
         assertTrue(UpdateCheck.newer("v0.2.2", "0.2.1+dev"));
         assertFalse(UpdateCheck.checkable("0.3.0-SNAPSHOT"));

@@ -377,7 +377,7 @@ public final class UpdateCheck {
 
     /** Whether this jar's version is worth comparing (see {@link Versions#checkable}). */
     static boolean checkable(String version) {
-        return Versions.checkable(version);
+        return Versions.checkable(version) && !Versions.localBuild(version);
     }
 
     /** Whether {@code latest} is a newer version than {@code mine}. */

@@ -11,6 +11,14 @@ public final class Versions {
      * Whether this jar's version is worth comparing: a release number, not a dev build or 0.0.0.
      * A local build after a release ("0.2.1+dev", build metadata) compares as that release.
      */
+    /**
+     * A jar built locally from the source ("0.2.4+dev": the last release plus "+dev"): it never
+     * looks for or installs a release, which would replace the work in progress.
+     */
+    public static boolean localBuild(String version) {
+        return version != null && version.toLowerCase(Locale.ROOT).contains("+dev");
+    }
+
     public static boolean checkable(String version) {
         String core = core(version);
         if (core == null) {
