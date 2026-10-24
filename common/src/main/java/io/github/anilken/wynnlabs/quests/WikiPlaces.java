@@ -28,8 +28,49 @@ final class WikiPlaces {
     /** A map template starting a line. */
     private static final Pattern BLOCK = Pattern.compile("(?m)^[ \\t]*\\{\\{\\s*(?:RenderLocation|Location|MapLink)\\b[^{}]*}}");
     private static final Pattern LEFT_OVER = Pattern.compile("<br\\s*/?>|[\\s*:.]");
+    /** A map template inside a task with the words that lead to it ("at", "starting from"; "are" is the wiki's typo for "at"). */
+    private static final Pattern IN_TEXT = Pattern.compile(
+            "(?i)(\\s+(?:starting\\s+)?(?:at|near|from|to|are))?\\s*\\{\\{\\s*(?:RenderLocation|Location|MapLink)\\b([^{}]*)}}");
+    /** A picture right before the task on its line: "[[File:Bodyguard.png|250px|left]]» Head to …". */
+    private static final Pattern PICTURE_BEFORE_TASK = Pattern.compile("^\\[\\[File:[^\\[\\]]*]]\\s*(?=»)");
+    private static final Pattern STAGE_HEADING = Pattern.compile("(?im)^==\\s*stage");
+    private static final Pattern SEGMENT_HEADING = Pattern.compile("(?im)^==\\s*segment\\s+\\d");
+    private static final Pattern SEGMENT =Pattern.compile("(?i)^segment\\s+\\d+");
 
     private WikiPlaces() {}
+
+    /**
+     * A task line with its map templates taken out: one with a "location" keeps the name ("at
+     * Fallen Factory Entrance"), one with only coordinates goes with the words that lead to it
+     * ("Talk to Zeph at {{MapLink|x=…}}." is "Talk to Zeph."). The places are read from the line before.
+     */
+    static String withoutTemplates(String line) {
+        return IN_TEXT.matcher(line).replaceAll(m -> {
+            String name = null;
+            Matcher p = PARAM.matcher(m.group(2));
+            while (p.find()) {
+                if (p.group(1).equalsIgnoreCase("location") && !p.group(2).isBlank()) {
+                    name = p.group(2).trim();
+                }
+            }
+            return name == null ? "" : Matcher.quoteReplacement((m.group(1) != null ? m.group(1) : "") + " " + name);
+        });
+    }
+
+    /** The line without a picture that stands right before its task. */
+    static String dropPictureBeforeTask(String line) {
+        return line.startsWith("[[File:") ? PICTURE_BEFORE_TASK.matcher(line).replaceFirst("") : line;
+    }
+
+    /** True for a page cut into "== Segment N ==" parts and no "== Stage N ==" ("???"). */
+    static boolean segmentPage(String text) {
+        return !STAGE_HEADING.matcher(text).find() && SEGMENT_HEADING.matcher(text).find();
+    }
+
+    /** "Segment 2 - Lab Y - \"Yahya's House\"": a part read as a stage on a {@link #segmentPage}. */
+    static boolean segmentHead(String head) {
+        return SEGMENT.matcher(head).find();
+    }
 
     /**
      * Each map template that starts a line and runs over the lines below ({{Location\n| x = 305\n| y = 69 …}})

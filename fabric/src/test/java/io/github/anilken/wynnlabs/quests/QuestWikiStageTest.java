@@ -116,4 +116,72 @@ class QuestWikiStageTest {
         assertArrayEquals(new int[] {-500, 69, -811}, st.at());
         assertEquals(1, st.hints().size());
     }
+
+    private static String task(String stageBody) {
+        return QuestWiki.parse("{{Infobox}}\n== Stage 1 ==\n" + stageBody).stages().get(0).task();
+    }
+
+    @Test
+    void aMapLinkInTheTaskKeepsTheTask() {
+        // Revelations in Fall, stage 1: the place sits in the task's sentence
+        QuestWiki.Stage st = QuestWiki.parse("{{Infobox}}\n== Stage 1 ==\n» Attend the meeting in the resistance camp at "
+                + "{{MapLink|x=-2238|y=32|z=-1207}}.\n\nThe meeting begins once the Player jumps onto a seat.\n").stages().get(0);
+        assertEquals("Attend the meeting in the resistance camp.", st.task());
+        assertArrayEquals(new int[] {-2238, 32, -1207}, st.at());
+        assertEquals(List.of("The meeting begins once the Player jumps onto a seat."), st.hints());
+        // Revelations in Fall, stages 12 and 5; The Cursed One, stage 11; A New Beginning, stage 11 ("are" for "at")
+        assertEquals("Walk through the gate to the Roughworks in Espren.",
+                task("» Walk through the gate to the Roughworks at {{MapLink|x=-2072|y=27|z=-938}} in Espren.\n"));
+        assertEquals("Travel across the roof tops of Espren.",
+                task("» Travel across the roof tops of Espren starting from {{MapLink|x=-2066|y=57|z=-1062}}.\n"));
+        assertEquals("Cast a spell ontop of the tree.", task("» Cast a spell ontop{{sic}} of the tree at {{MapLink|x=-2150|y=52|z=-1262}}.\n"));
+        assertEquals("Introduce yourself to the Resistance Members.",
+                task("» Introduce yourself to the Resistance Members are {{MapLink|x=-2228|y=24|z=-1190}}.\n"));
+    }
+
+    @Test
+    void aNamedPlaceInTheTaskKeepsItsName() {
+        // The Envoy Part II, stage 13; Lexdale Witch Trials, stage 2 (an empty name)
+        QuestWiki.Stage st = QuestWiki.parse("== Stage 1 ==\n» Find Maxie outside the factory at {{RenderLocation| location = "
+                + "Fallen Factory Entrance| x = -1707| y = 75| z = -2610}}\n").stages().get(0);
+        assertEquals("Find Maxie outside the factory at Fallen Factory Entrance", st.task());
+        assertArrayEquals(new int[] {-1707, 75, -2610}, st.at());
+        assertEquals("Explore the basement of the decayed and barren house.",
+                task("» Explore the basement of the decayed and barren house.{{RenderLocation|location=|x=-588|y=62|z=-5465}}\n"));
+    }
+
+    @Test
+    void aLaterMapLinkTaskStaysOut() {
+        // Through the Pipes, stage 3: a second "»" line (the stage again, after leaving) adds no hint
+        QuestWiki.Stage st = QuestWiki.parse("== Stage 1 ==\n» Enter the drainage hole at {{MapLink|x=-1699|y=33|z=-516}}.\n"
+                + "Enter the hole at the destination.\n» Enter the drainage hole at {{MapLink|x=-1699|y=33|z=-516}} to continue the search.\n")
+                .stages().get(0);
+        assertEquals("Enter the drainage hole.", st.task());
+        assertEquals(List.of("Enter the hole at the destination."), st.hints());
+    }
+
+    @Test
+    void aPictureBeforeTheTaskIsLeftOut() {
+        // A Hunter's Calling, stage 6
+        assertEquals("Head to the northern part of the Bank and find a way up to the ceiling.",
+                task("[[File:Bodyguard.png|250px|left]]» Head to the northern part of the Bank and find a way up to the ceiling.\n"));
+    }
+
+    @Test
+    void segmentsAreStagesOnAPageWithout() {
+        // ???: "Segment N" parts in place of stages; the bonus lore stays out, the tips join the last part as on any page
+        String text = "{{Infobox/Quest\n| level= 80\n}}\nIntro.\n==Segment 1 - Starting the Quest - \"The Meteors\"==\n"
+                + "'''This section requires three players in total.'''\n===Blue Meteor===\n"
+                + "{{RenderLocation| location = [[Aldorei Valley|Aldorei Valley Outskirts]] | x = -754 | y = 102 | z = -4416 }}\n"
+                + "==Segment 2 - Lab Y - \"Yahya's House\"==\n'''This section requires one player in total.'''\n"
+                + "==Bonus Segment - Additional Secret Lore==\nLore.\n==Tips==\nA tip.\n";
+        List<QuestWiki.Stage> stages = QuestWiki.parse(text).stages();
+        assertEquals(2, stages.size());
+        assertEquals("Segment 2 - Lab Y - \"Yahya's House\"", stages.get(1).title());
+        assertArrayEquals(new int[] {-754, 102, -4416}, stages.get(0).at());
+        assertEquals(List.of("This section requires one player in total.", "▸ Tips", "A tip."), stages.get(1).hints());
+        // a page with stages keeps them only
+        assertEquals(List.of("Stage 1"), QuestWiki.parse("== Stage 1 ==\n» Go.\n== Segment 2 ==\n» Not a stage.\n").stages()
+                .stream().map(QuestWiki.Stage::title).toList());
+    }
 }

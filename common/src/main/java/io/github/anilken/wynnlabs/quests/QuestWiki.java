@@ -342,10 +342,11 @@ public final class QuestWiki {
         List<String[]> stageBlocks = new ArrayList<>();
         // a place without a height takes the last one given, on this stage or an earlier one
         int lastY = 64;
+        boolean segments = WikiPlaces.segmentPage(text);    // "???": "== Segment 1 - … ==" in place of stages
         for (String b : text.split("(?m)^==\\s*")) {
             String head = b.contains("\n") ? b.substring(0, b.indexOf('\n')).replaceAll("=", "").trim() : "";
             String rest = b.contains("\n") ? b.substring(b.indexOf('\n') + 1) : "";
-            if (head.toLowerCase(Locale.ROOT).startsWith("stage")) {
+            if (head.toLowerCase(Locale.ROOT).startsWith("stage") || segments && WikiPlaces.segmentHead(head)) {
                 stageBlocks.add(new String[] {head, rest});
             } else if (!stageBlocks.isEmpty() && !OTHER_SECTION.matcher(head).find()) {
                 String[] last = stageBlocks.get(stageBlocks.size() - 1);
@@ -393,7 +394,7 @@ public final class QuestWiki {
             List<int[]> points = new ArrayList<>();
             List<String> names = new ArrayList<>();
             for (String raw : body.split("\n")) {
-                String l = raw.trim();
+                String l = WikiPlaces.dropPictureBeforeTask(raw.trim());
                 if (l.startsWith("|") && spoilers.contains(l)) {
                     for (WikiPlaces.Template t : WikiPlaces.templates(l, lastY(points, lastY))) {
                         points.add(t.at());
@@ -426,12 +427,17 @@ public final class QuestWiki {
                 // a place line: the template alone, or one the guides always took as such; any other
                 // line with a template ("Go to the cave.{{RenderLocation|coordinates=…}}") stays text
                 if (full || l.contains("{{RenderLocation") && RENDER_XZ.matcher(l).find() || !ts.isEmpty() && WikiPlaces.onlyTemplates(l)) {
-                    // the task may follow the place on the same line: "{{RenderLocation ...}}» Go ..."
+                    // the task may follow the place on the same line: "{{RenderLocation ...}}» Go ...",
+                    // or be it: "» Talk to Zeph at {{MapLink|x=…}}." is the task, the template cut out
+                    // (a later one, a fallback stage's, is still left out as before)
                     int close = l.indexOf("}}");
-                    if (close < 0 || l.indexOf('»', close) < 0) {
+                    if (l.startsWith("»") && task.isEmpty()) {
+                        l = WikiPlaces.withoutTemplates(l);
+                    } else if (close < 0 || l.indexOf('»', close) < 0) {
                         continue;
+                    } else {
+                        l = l.substring(l.indexOf('»', close));
                     }
-                    l = l.substring(l.indexOf('»', close));
                 }
                 String c = clean(l);
                 if (c.isEmpty() || IMAGE.matcher(c).find()) {        // a picture's file name and caption
@@ -508,7 +514,7 @@ public final class QuestWiki {
 
     /** Page sections that are not part of the walkthrough. */
     private static final Pattern OTHER_SECTION = Pattern.compile(
-            "(?i)\\b(trivia|rewards?|navigation|gallery|references|history|bugs?|videos?|dialogue|transcript|removed|npcs?|mobs?|items?)\\b");
+            "(?i)\\b(trivia|rewards?|bonus|navigation|gallery|references|history|bugs?|videos?|dialogue|transcript|removed|npcs?|mobs?|items?)\\b");
 
     /** True when x, y, z can be a place in the world: y in the build height, not at the origin. */
     private static boolean place(int[] at) {
