@@ -316,7 +316,7 @@ public final class Settings {
     private static final java.util.Set<String> OFF_BY_DEFAULT = java.util.Set.of("altAdvice", "groundGlowNormal", "priceApi",
             "localApi", "apiWrite", "debug", "dpsHud", "autoUpdate",
             "chatUpgrade", "coachToasts", "mobTrackSound", "groundBeam", "groundGlowOther", "hotbarBadges", "learning",
-            "powderHint", "boxPrices");
+            "powderHint");
 
     public static boolean on(String key) {
         load();
