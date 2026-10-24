@@ -137,7 +137,7 @@ public final class MarketSlots {
      * into a shop's slots, or one on a bank page turned to and not read yet: new stacks there).
      */
     private record Ranking(long key, long built, Map<ItemStack, Advice.Entry> bag, Map<String, Advice.Entry> bank,
-            Map<String, Advice.Entry> byKey) {}
+            Map<String, Advice.Entry> byKey, List<Candidate> all, int slots) {}
 
     private static volatile Ranking ranking;
     private static boolean building;                // a verdict asked while ranking: no ranking inside it
@@ -163,9 +163,46 @@ public final class MarketSlots {
             } else if (shopOpen() || Vault.bankOpen()) {
                 // a page just turned to (not read yet) or a stack moved into a shop: by what it is
                 cut = r.byKey().get(ItemJson.keyOf(stack));
+                if (cut == null && shopOpen() && !inBag(stack)) {
+                    cut = joining(r, stack);            // a chest's item: judged as if you took it
+                }
             }
         }
         return cut != null ? cut : e;
+    }
+
+    /**
+     * A stack in an open chest, ranked as if it joined the bag: the Blacksmith when the orders are
+     * taken by items that bring in more, else null (it keeps the Trade Market). So its colour in
+     * the chest is the one it gets once you take it.
+     */
+    private static Advice.Entry joining(Ranking r, ItemStack stack) {
+        GameState state = GameState.current();
+        double gain = AutoAdvice.gain(stack);
+        double worth = Double.isNaN(gain) ? priced(ItemJson.clean(stack.getHoverName().getString())) : gain;
+        if (highRoll(stack)) {
+            return null;                                // a high roll always takes an order
+        }
+        int place = 1;
+        for (Candidate c : r.all()) {
+            boolean ahead = Double.isNaN(worth) ? !Double.isNaN(c.gain()) : !Double.isNaN(c.gain()) && c.gain() >= worth;
+            if (ahead) {
+                place += Math.max(1, c.copies());
+            }
+        }
+        String kind = state.view(stack).map(AutoAdvice::kindOf).orElse("unknown");
+        int need = copies(kind, stack.getCount());
+        return place + need - 1 <= r.slots() ? null : new Advice.Entry(Verdict.SELL, note(r.slots(), place));
+    }
+
+    /** Whether the stack is one of the bag's own (by identity), not a chest's. */
+    private static boolean inBag(ItemStack stack) {
+        for (ItemStack s : GameState.current().inventory()) {
+            if (s == stack) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The note for a kept bank stack the limit sends to the Blacksmith, else null. */
@@ -222,7 +259,7 @@ public final class MarketSlots {
             try {
                 r = build(key, now);
             } catch (Throwable ignored) {
-                r = new Ranking(key, now, Map.of(), Map.of(), Map.of());  // no limit rather than a broken tooltip
+                r = new Ranking(key, now, Map.of(), Map.of(), Map.of(), List.of(), MAX);  // no limit rather than a broken tooltip
             } finally {
                 building = false;
             }
@@ -286,7 +323,7 @@ public final class MarketSlots {
             }
         }
         seated.forEach(byKey::remove);
-        return new Ranking(key, now, bag, bank, byKey);
+        return new Ranking(key, now, bag, bank, byKey, List.copyOf(all), slots);
     }
 
     /** A kept stack's worth: judged again from the kept item when it can be, else its price. */
