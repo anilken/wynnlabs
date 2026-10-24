@@ -99,7 +99,7 @@ class BoxMarketTest {
 
     @Test
     void possiblySoldListingsAreShownButLeftOutOfPrices() {
-        List<Listing> l = List.of(id(500, 60, 10), id(100, 90, 5 * 60));
+        List<Listing> l = List.of(id(500, 60, 10), id(100, 90, 4 * 24 * 60));
         Row r = BoxMarket.row(item("Atoll", true), held(l, null), null, true, Filter.ALL, Sort.PRICE);
         assertEquals(2, r.count());
         assertEquals(500, r.lowest());
@@ -163,7 +163,7 @@ class BoxMarketTest {
     @Test
     void ownRollAgainstTheMarket() {
         List<Listing> l = new ArrayList<>(seven());
-        l.add(id(5, 99, 5 * 60));                       // possibly sold: not counted
+        l.add(id(5, 99, 4 * 24 * 60));                       // possibly sold: not counted
         assertEquals(2, BoxMarket.better(BoxMarket.markSold(l), 72));   // 86.4 % and 80 %
     }
 }

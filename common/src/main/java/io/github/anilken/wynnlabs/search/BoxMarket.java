@@ -14,7 +14,7 @@ import java.util.function.ToDoubleFunction;
  * The box contents window's model: every item a gear box can hold, with its current Trade Market
  * listings as Wynnventory reported them, filtered (all, identified, unidentified) and sorted (by
  * roll or by price). Pure: the window hands in the box's items and what the listings store holds,
- * and draws what comes out. Listings seen more than 3 hours before the item's newest one are
+ * and draws what comes out. Listings seen more than 3 days before the item's newest one are
  * marked possibly sold: shown, but left out of every price.
  */
 public final class BoxMarket {
@@ -67,9 +67,9 @@ public final class BoxMarket {
     public record Summary(Double average, Double best, Double unidentified) {}
 
     /** How long before the newest listing one counts as possibly sold. */
-    public static final long SOLD_AFTER = 3 * 3_600_000L;
+    public static final long SOLD_AFTER = 3 * 24 * 3_600_000L;
 
-    /** The listings with {@link Listing#possiblySold} set from the newest one's time (3-hour window). */
+    /** The listings with {@link Listing#possiblySold} set from the newest one's time (3-day window). */
     public static List<Listing> markSold(List<Listing> listings) {
         long newest = 0;
         for (Listing l : listings) {

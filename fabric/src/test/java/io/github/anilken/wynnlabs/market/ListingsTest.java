@@ -96,7 +96,7 @@ class ListingsTest {
     }
 
     @Test
-    void listingsThreeHoursOlderThanTheNewestAreMarked() throws IOException {
+    void listingsThreeDaysOlderThanTheNewestAreMarked() throws IOException {
         Listings.put("Atoll", 1, Listings.parse("Atoll", answer("listings-atoll-p1.json")), System.currentTimeMillis());
         List<BoxMarket.Listing> held = Listings.held("Atoll").listings();
         assertEquals(1, held.stream().filter(BoxMarket.Listing::possiblySold).count());
