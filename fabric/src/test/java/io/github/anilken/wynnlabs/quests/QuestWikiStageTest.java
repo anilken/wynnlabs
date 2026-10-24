@@ -40,4 +40,15 @@ class QuestWikiStageTest {
         assertEquals(158, info.stages().get(0).at()[0], "the place pin comes first");
         assertEquals(".;I. ,told;. .,you; :to, .,stay; .away';", info.stages().get(1).task());
     }
+
+    @Test
+    void aPlaceWithoutHeightStillPins() {
+        // A Journey Beyond, stage 15: the Silent Expanse's pages give x and z only
+        String text = "{{Infobox}}\n==Stage 15==\n» Find Aledar, Lucio and Elphaba in the Fallen City. <br>\n"
+                + "{{RenderLocation | location = [[Silent Expanse|The Silent Expanse]] | x = 489 | z = -601 }}\n";
+        QuestWiki.Info info = QuestWiki.parse(text);
+        int[] at = info.stages().get(0).at();
+        assertEquals(489, at[0]);
+        assertEquals(-601, at[2]);
+    }
 }
