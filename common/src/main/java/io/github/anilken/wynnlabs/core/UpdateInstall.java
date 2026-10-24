@@ -95,7 +95,7 @@ public final class UpdateInstall {
      * changes what it installs.
      */
     static synchronized boolean schedule(String version, String tag, String sha256, Optional<Path> jar) {
-        if (!Versions.checkable(version) || jar == null || jar.isEmpty()) {
+        if (!Versions.checkable(version) || Versions.localBuild(version) || jar == null || jar.isEmpty()) {
             return false;
         }
         Path dir = UpdatePrefs.folder();
