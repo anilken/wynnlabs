@@ -677,13 +677,13 @@ public final class Prices {
         var list = body.getAsJsonArray("data");
         // Listings are what players saw on the market, in snapshots: an old snapshot keeps
         // listings that have sold since (the cheap ones go first). The prices come from those seen
-        // within 3 hours of the newest; the count from every listing, since a snapshot holds only
-        // what that player looked at.
+        // within 3 days of the newest (the market window's rule); the count from every listing,
+        // since a snapshot holds only what that player looked at.
         long newest = 0;
         for (var el : list) {
             newest = Math.max(newest, seenAt(el.getAsJsonObject()));
         }
-        long cutoff = newest > 0 ? newest - 3 * 3_600_000L : 0;
+        long cutoff = newest > 0 ? newest - io.github.anilken.wynnlabs.search.BoxMarket.SOLD_AFTER : 0;
         Integer low = null;
         Integer unidLow = null;
         int count = 0;
