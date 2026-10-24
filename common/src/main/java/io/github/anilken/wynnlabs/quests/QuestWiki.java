@@ -340,6 +340,8 @@ public final class QuestWiki {
         // a part under a stage ("=== Puzzle ===", "Tips"): its lines and places join that stage,
         // after a "▸ Puzzle" line; the page's other sections (trivia, rewards, dialogue) stay out
         List<String[]> stageBlocks = new ArrayList<>();
+        // a place without a height takes the last one given, on this stage or an earlier one
+        int lastY = 64;
         for (String b : text.split("(?m)^==\\s*")) {
             String head = b.contains("\n") ? b.substring(0, b.indexOf('\n')).replaceAll("=", "").trim() : "";
             String rest = b.contains("\n") ? b.substring(b.indexOf('\n') + 1) : "";
@@ -375,7 +377,13 @@ public final class QuestWiki {
                     }
                 }
             }
-            body = body.replaceAll("(?s)\\{\\{MobTable}}.*?\\n\\|}", "");
+            body = WikiPlaces.joinTemplates(body.replaceAll("(?s)\\{\\{MobTable}}.*?\\n\\|}", ""));
+            // a spoiler's text on the line after "{{HideSpoiler" starts with "|" and is skipped: its places are still read
+            java.util.Set<String> spoilers = new java.util.HashSet<>();
+            Matcher sp = SPOILER_LINE.matcher(body);
+            while (sp.find()) {
+                spoilers.add(sp.group(1).trim());
+            }
             // spoilers: drop the wrapper only; its closing "|label}}" line starts with "|" and is skipped
             body = body.replace("{{HideSpoiler|1=", "").replace("{{HideSpoiler|", "").replace("{{HideSpoiler", "");
             body = dropBlockTemplates(body);
@@ -386,24 +394,38 @@ public final class QuestWiki {
             List<String> names = new ArrayList<>();
             for (String raw : body.split("\n")) {
                 String l = raw.trim();
+                if (l.startsWith("|") && spoilers.contains(l)) {
+                    for (WikiPlaces.Template t : WikiPlaces.templates(l, lastY(points, lastY))) {
+                        points.add(t.at());
+                        names.add(t.name() != null ? clean(t.name()) : UNNAMED);
+                    }
+                    textPlaces(clean(l.substring(1)), points, names, lastY(points, lastY));
+                    continue;
+                }
                 if (l.isEmpty() || l.startsWith("[[File:") || l.startsWith("'''Dialogue") || l.startsWith("*'''")
                         || l.startsWith("{{Clear") || l.startsWith("|") || l.startsWith("{|")) {
                     continue;
                 }
+                // a map template ({{RenderLocation | location = … | x = … | y = … | z = … }}, values in
+                // any order); one without a height takes the last point's
+                List<WikiPlaces.Template> ts = WikiPlaces.templates(l, lastY(points, lastY));
                 Matcher r = RENDER.matcher(l);
-                Matcher rxz = RENDER_XZ.matcher(l);
                 boolean full = r.find();
-                if (full || l.contains("{{RenderLocation") && rxz.find()) {
-                    // no height given: the last point's, else ground level
-                    int y = points.isEmpty() ? 64 : points.get(points.size() - 1)[1];
-                    int[] pt = full ? new int[] {Integer.parseInt(r.group(1)), Integer.parseInt(r.group(2)), Integer.parseInt(r.group(3))}
-                            : new int[] {Integer.parseInt(rxz.group(1)), y, Integer.parseInt(rxz.group(2))};
+                if (ts.isEmpty() && full) {
                     Matcher nm = RENDER_NAME.matcher(l);
-                    points.add(pt);
-                    names.add(nm.find() ? clean(nm.group(1)) : UNNAMED);
+                    ts = List.of(new WikiPlaces.Template(new int[] {Integer.parseInt(r.group(1)), Integer.parseInt(r.group(2)),
+                            Integer.parseInt(r.group(3))}, nm.find() ? nm.group(1) : null));
+                }
+                for (WikiPlaces.Template t : ts) {
+                    points.add(t.at());
+                    names.add(t.name() != null ? clean(t.name()) : UNNAMED);
                     if (at == null) {
-                        at = pt;
+                        at = t.at();
                     }
+                }
+                // a place line: the template alone, or one the guides always took as such; any other
+                // line with a template ("Go to the cave.{{RenderLocation|coordinates=…}}") stays text
+                if (full || l.contains("{{RenderLocation") && RENDER_XZ.matcher(l).find() || !ts.isEmpty() && WikiPlaces.onlyTemplates(l)) {
                     // the task may follow the place on the same line: "{{RenderLocation ...}}» Go ..."
                     int close = l.indexOf("}}");
                     if (close < 0 || l.indexOf('»', close) < 0) {
@@ -415,25 +437,9 @@ public final class QuestWiki {
                 if (c.isEmpty() || IMAGE.matcher(c).find()) {        // a picture's file name and caption
                     continue;
                 }
-                Matcher m = COORDS.matcher(c);
-                boolean found = false;
-                while (m.find()) {
-                    int[] pt = {Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), Integer.parseInt(m.group(3))};
-                    points.add(pt);
-                    names.add(c.length() > 40 ? c.substring(0, 40) : c);
-                    found = true;
-                    if (at == null) {
-                        at = pt;
-                    }
-                }
-                // "* Cargo: 2027, 74, -4631", "at (-1079, 85, -5600)": a place without brackets
-                Matcher lm = found ? null : LOOSE.matcher(c);
-                while (lm != null && lm.find()) {
-                    int[] pt = {Integer.parseInt(lm.group(1)), Integer.parseInt(lm.group(2)), Integer.parseInt(lm.group(3))};
-                    if (place(pt)) {
-                        points.add(pt);
-                        names.add(c.length() > 40 ? c.substring(0, 40) : c);
-                    }
+                int[] bracketed = textPlaces(c, points, names, lastY(points, lastY));
+                if (at == null) {
+                    at = bracketed;
                 }
                 if (c.startsWith("»") && task.isEmpty()) {
                     task = c.substring(1).trim();
@@ -441,9 +447,60 @@ public final class QuestWiki {
                     hints.add(c);
                 }
             }
+            if (at == null && !points.isEmpty()) {
+                at = points.get(0);                     // a stage named only loosely still has a place to head for
+            }
+            lastY = lastY(points, lastY);
             base.stages().add(new Stage(head, task, hints, at, points, names));
         }
         return base;
+    }
+
+    /** "{{HideSpoiler" with its text starting the next line ("|Go through the gate at …|the next clue}}"). */
+    private static final Pattern SPOILER_LINE = Pattern.compile("(?m)^\\{\\{HideSpoiler\\s*(\\|[^\\n]*)");
+
+    private static int lastY(List<int[]> points, int before) {
+        return points.isEmpty() ? before : points.get(points.size() - 1)[1];
+    }
+
+    /**
+     * The places a cleaned line names, added to the stage's (each named by the line): every
+     * "[x, y, z]"; else "x, y, z" without brackets ("* Cargo: 2027, 74, -4631"); else the looser
+     * forms {@link WikiPlaces} reads ("at 465 28 -7920", "at (685, -407)"). The first bracketed
+     * place, or null.
+     */
+    private static int[] textPlaces(String c, List<int[]> points, List<String> names, int lastY) {
+        String name = c.length() > 40 ? c.substring(0, 40) : c;
+        int[] first = null;
+        Matcher m = COORDS.matcher(c);
+        while (m.find()) {
+            int[] pt = {Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), Integer.parseInt(m.group(3))};
+            points.add(pt);
+            names.add(name);
+            if (first == null) {
+                first = pt;
+            }
+        }
+        if (first != null) {
+            return first;
+        }
+        boolean found = false;
+        Matcher lm = LOOSE.matcher(c);
+        while (lm.find()) {
+            int[] pt = {Integer.parseInt(lm.group(1)), Integer.parseInt(lm.group(2)), Integer.parseInt(lm.group(3))};
+            if (place(pt)) {
+                points.add(pt);
+                names.add(name);
+                found = true;
+            }
+        }
+        if (!found) {
+            for (int[] pt : WikiPlaces.loose(c, lastY)) {
+                points.add(pt);
+                names.add(name);
+            }
+        }
+        return null;
     }
 
     /** A gallery or picture line: "File:Spider Cave.png|Spider Cave", "Yuman and Zeph (Cave hideout).png". */
